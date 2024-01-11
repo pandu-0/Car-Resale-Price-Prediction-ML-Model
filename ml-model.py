@@ -21,7 +21,7 @@ df_copy = df.copy().drop_duplicates()
 # then convert the value to a integer
 cleaned_price = [int(str(value).strip("$").replace(",", "")) for value in df_copy['price'].values]
 
-print(cleaned_price)
+# print(cleaned_price)
 
 
 # %% [markdown]
@@ -34,7 +34,7 @@ print(cleaned_price)
 # finally converting to an intiger
 miles = [ int(str(m).replace("miles", "").replace(",", "").strip()) for m in df_copy["miles"].values ]
 
-print(miles)
+# print(miles)
 len(miles)
 
 # %% [markdown]
@@ -49,14 +49,16 @@ temp_name = [str(name).split(" ", maxsplit=1) for name in temp_name.values]
 # make of the car
 make = [arr[0] for arr in temp_name]
 
-print(make)
+# print(make)
 len(make)
+
+type(make[0])
 
 # %%
 # model of the car
 model = [arr[1] for arr in temp_name]
 
-print(model)
+# print(model)
 len(model)
 
 # %% [markdown]
@@ -66,21 +68,21 @@ len(model)
 # Let's split this into 2 columns: exterior-color and interior-color
 colors = [ str(color).split(",") for color in df_copy["color"].values ]
 
-print(colors)
+# print(colors)
 len(colors)
 
 # %%
 # Let's replace the word exterior and strip the string
 exterior_color = [ str(color[0]).replace("exterior", "").strip() for color in colors ]
 
-print(exterior_color)
+# print(exterior_color)
 len(exterior_color)
 
 # %%
 # Let's replace the word interior and strip the string
 interior_color = [ str(color[1]).replace("interior", "").strip() for color in colors ]
 
-print(interior_color)
+# print(interior_color)
 len(interior_color)
 
 # %% [markdown]
@@ -93,14 +95,14 @@ conditions = [ str(condition).split(",") for condition in df_copy['condition'].v
 # we replace "No accidents reported" with a 0
 accidents = [ int(str(condition[0]).replace("No", "0").replace("accidents reported", "").replace("accident reported", "").strip()) for condition in conditions]
 
-print(accidents)
+# print(accidents)
 len(accidents)
 
 # %%
 # replace the words in the column and make them an intiger
 owners = [ int(str(condition[1]).replace("Owners", "").replace("Owner", "").strip()) for condition in conditions]
 
-print(owners)
+# print(owners)
 len(owners)
 
 # %%
@@ -452,7 +454,7 @@ plt.xticks(rotation=90);
 # # Preprocessing
 
 # %% [markdown]
-# Let's preprocessing the data!
+# Let's start preprocessing the data!
 
 # %%
 # import StandardScaler, QuantileScaler, and One Hot Encoder
@@ -544,21 +546,46 @@ import numpy as np
 from sklearn.impute import SimpleImputer
 
 # Initialize the SimpleImputer
-imp = SimpleImputer(missing_values=np.nan, strategy='most_frequent')
+# imp = SimpleImputer(missing_values=np.nan, strategy='most_frequent')
 
-imp.fit_transform(X)
+# imp.fit_transform(X)
+
+# %% [markdown]
+# ## Preprocessor
 
 # %%
+# Define the pipeline for numerical columns
+num_pipeline = Pipeline(steps=[
+    ('impute_num', SimpleImputer(missing_values=np.nan, strategy='median')),
+    ('scale', QuantileTransformer())
+])
+
+# Define the pipeline for categorical columns
+cat_pipeline = Pipeline(steps=[
+    ('impute_cat', SimpleImputer(missing_values=np.nan, strategy='most_frequent')),
+    ('encode', OneHotEncoder(sparse_output=False, handle_unknown='ignore'))
+])
+
 # we use the ColumnTransformer to scale and encode
 preprocessor = ColumnTransformer(
     transformers=[
-        # numerical columns scaled using the QuantileTransformer
-        ("num", QuantileTransformer(), ['year', 'miles', 'accidents-reported', 'num-of-owners']),
-        # categorical columns encoded using the OneHotEncoder
-        ("cat", OneHotEncoder(handle_unknown='ignore'),  ['make', 'model', 'exterior-color', 'interior-color'])
-    ]
+        ('num', num_pipeline, ['year', 'miles', 'accidents-reported', 'num-of-owners']),
+        ('cat', cat_pipeline, ['make', 'model', 'exterior-color', 'interior-color']),
+    ], remainder="passthrough"
 )
 
+# we use the ColumnTransformer to scale and encode
+# preprocessor = ColumnTransformer(
+#     transformers=[
+#         ("impute_num", SimpleImputer(missing_values=np.nan, strategy='median'), ['year', 'miles', 'accidents-reported', 'num-of-owners']),
+#         ("impute_cat", SimpleImputer(missing_values=np.nan, strategy='most_frequent'), ['make', 'model', 'exterior-color', 'interior-color']),
+#         # categorical columns encoded using the OneHotEncoder
+#         ("cat", OneHotEncoder(sparse_output=False, handle_unknown='ignore'),  ['make', 'model', 'exterior-color', 'interior-color']),
+#         # numerical columns scaled using the QuantileTransformer
+#         ("num", QuantileTransformer(), ['year', 'miles', 'accidents-reported', 'num-of-owners']),
+#     ]
+# )
+# df_final.columns
 # fit the data
 # X_transformed = preprocessor.fit_transform(X)
 # y_transformed = ColumnTransformer(transformers=[ ('num', QuantileTransformer(), ['price']) ]).fit_transform(y)
@@ -573,13 +600,14 @@ X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2)
 # import models
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.model_selection import GridSearchCV
-# from sklearn.metrics import precision_score, f1_score, make_scorer
+from sklearn.metrics import make_scorer, r2_score, mean_absolute_error, mean_squared_log_error, median_absolute_error, mean_gamma_deviance, mean_poisson_deviance
 from sklearn.neighbors import KNeighborsRegressor
 # from sklearn.linear_model import LogisticRegression
 
 # Contruct our pipline
 RFR = Pipeline([
     ("preprocessor", preprocessor),
+    # The “random” in Random Forest comes from this process of randomly selecting a subset of features for consideration at each split
     ("model", RandomForestRegressor(random_state=5))
 ])
 
@@ -595,21 +623,23 @@ KNN = Pipeline([
 # %%
 forest_model = GridSearchCV(
     estimator=RFR,
-    # max_features: It decides how many features each tree in the RF considers at each split
     param_grid={
         'model__bootstrap': [True, False],
+        # mesure the quality of a split
         'model__criterion': ['friedman_mse', 'squared_error', 'poisson'],
         # 'model__max_depth': [2, 4],
-        # 'model__max_features': [3, 4, 5, 6, 7],
-        # 'model__min_samples_leaf':[1,2],
+        # max_features: It decides how many features each tree in the RF considers at each split
+        'model__max_features': [1, 2, 3, 4, 5, 6, 7],
+        # 'model__min_samples_leaf':[1,2,3],
         # 'model__min_samples_split': [2,5],
         'model__n_estimators': [int(x) for x in np.linspace(10, 80, 10)],
     },
-    # scoring={"precision": make_scorer(precision_score)},
     verbose=2,
     n_jobs=4,
+    scoring={"r2_score": make_scorer(r2_score), "mean_gamma_deviance": make_scorer(mean_gamma_deviance)},
     # so that our model is refit with the best params
-    refit=True,
+    refit="mean_gamma_deviance",
+    # refit=True,
     cv=3
 )
 
@@ -618,12 +648,15 @@ knn_model = GridSearchCV(
     # max_features: It decides how many features each tree in the RF considers at each split
     param_grid={
         'model__n_neighbors': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-        'model__weights': ['uniform', 'distance']
+        'model__weights': ['uniform', 'distance'],
     },
     verbose=2,
     n_jobs=4,
+    scoring={"r2_score": make_scorer(r2_score), "mean_gamma_deviance": make_scorer(mean_gamma_deviance)},
     # so that our model is refit with the best params
-    refit=True,
+    refit="r2_score",
+    # so that our model is refit with the best params
+    # refit=True,
     cv=3
 )
 
@@ -652,14 +685,14 @@ knn_model.fit(X_tr, np.ravel(y_tr))
 # ## Results
 
 # %% [markdown]
-# Accuracy of RandomForestRegressor:
+# Score of RandomForestRegressor:
 
 # %%
 print("Train: ", forest_model.score(X_tr, np.ravel(y_tr)))
 print("Test: ", forest_model.score(X_te, np.ravel(y_te)))
 
 # %% [markdown]
-# Accuracy of KNearestNeighborsRegressor:
+# Score of KNearestNeighborsRegressor:
 
 # %%
 print("Train", knn_model.score(X_tr, np.ravel(y_tr)))
