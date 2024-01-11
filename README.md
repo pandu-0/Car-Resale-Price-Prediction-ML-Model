@@ -6,7 +6,7 @@ This is my **first ML model** that I coded!
 
 Summary:  
 
-I used **Scikit-learn** in Python to create two predictive **Regression** models using **K-Nearest Neighbors** and **Random Forest** algorithms. I also **learned** Pandas, Matplotlib, and Seaborn for comprehensive data **cleaning**, **analysis**, and **visualization** to gain insights and for informed model development (it was hard :( ). In addition, I applied **GridSearch** for **hyperparameter tuning** to optimize the performance of the ML models.
+I used **Scikit-learn** in Python to create two predictive **Regression** models using **K-Nearest Neighbors** and **Random Forest** algorithms. I also **learned** Pandas, Matplotlib, and Seaborn for comprehensive data **cleaning**, **analysis**, and **visualization** to gain insights and for informed model development - it was hard :(. In addition, I applied **GridSearch** for **hyperparameter tuning** to optimize the performance of the ML models.
 
 ---
 
